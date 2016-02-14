@@ -113,3 +113,27 @@ function(BII_BOOST_SET_CLANG_COMPILER BII_BOOST_DIR BII_BOOST_VERBOSE RETURN)
       set(${RETURN} ${Boost_COMPILER} PARENT_SCOPE)
   endif()
 endfunction()
+
+# From https://software.lanl.gov/MeshTools/trac/browser/cmake/modules/ParseLibraryList.cmake
+function(parse_library_list LIBRARIES)
+    foreach( item ${LIBRARIES} )
+        if( ${item} MATCHES debug     OR 
+            ${item} MATCHES optimized OR 
+            ${item} MATCHES general )
+
+            if( ${item} STREQUAL "debug" )
+                set( mylist "_debug_libs" )
+            elseif( ${item} STREQUAL "optimized" )
+                set( mylist "_opt_libs" )
+            elseif( ${item} STREQUAL "general" )
+                set( mylist "_gen_libs" )
+            endif()
+      else()
+          list( APPEND ${mylist} ${item} )
+      endif()
+    endforeach()
+
+    set(DEBUG_LIBS     ${_debug_libs}     PARENT_SCOPE)
+    set(OPTIMIZED_LIBS ${_optimized_libs} PARENT_SCOPE)
+    set(GENERAL_LIBS   ${_gen_libs}       PARENT_SCOPE)
+endfunction()

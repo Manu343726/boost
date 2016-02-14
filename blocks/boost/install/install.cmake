@@ -1,5 +1,8 @@
-include(boost/install/utils)
-include(boost/install/build_jobs)
+get_filename_component(boost_install_dir "${CMAKE_CURRENT_LIST_FILE}" PATH)
+
+include(${boost_install_dir}/utils.cmake)
+include(${boost_install_dir}/build_jobs.cmake)
+include(${boost_install_dir}/dependencies.cmake)
 include(CMakeParseArguments)
 
 set(SCOPE PARENT_SCOPE)
@@ -55,8 +58,17 @@ function(__BII_BOOST_BOOTSTRAP)
 
         execute_process(COMMAND ${__BII_BOOST_BOOTSTRAP_CALL} WORKING_DIRECTORY ${BII_BOOST_DIR}
                         RESULT_VARIABLE Result OUTPUT_VARIABLE Output ERROR_VARIABLE Error)
-        if(NOT Result EQUAL 0)
+        if(NOT (Result EQUAL 0))
             message(FATAL_ERROR "Failed running ${__BII_BOOST_BOOTSTRAP_CALL}:\n${Output}\n${Error}\n")
+        else()
+            if(__BII_BOOST_VERBOSE)
+                message("Bootstrap output: ${Output}")
+            endif()
+
+            execute_process(
+                COMMAND ${__BII_BOOST_B2} tools/bcp
+                WORKING_DIRECTORY ${BII_BOOST_DIR}
+            )
         endif()
     else()
         if(__BII_BOOST_VERBOSE)
@@ -70,18 +82,6 @@ function(__BII_BOOST_BUILD)
         message(STATUS "Building Boost ${BII_BOOST_VERSION} components with toolset ${BII_BOOST_TOOLSET}...")
 
         BII_BOOST_BUILD_LIBS_PARALLEL("${BII_BOOST_LIBS}" "${__BII_BOOST_B2_CALL}" "${BII_BOOST_VERBOSE}" "${BII_BOOST_DIR}")
-
-        if((NOT (Boost_USE_STATIC_LIBS)) AND (WIN32 OR (CMAKE_SYSTEM_NAME MATCHES "Darwin")))
-            file(GLOB __dlls "${BII_BOOST_DIR}/stage/lib/*${__DYNLIB_EXTENSION}")
-
-            foreach(dll ${__dlls})
-                if(BII_BOOST_VERBOSE)
-                    message(STATUS ">>>> Copying ${dll} to project bin/ directory (${CMAKE_SOURCE_DIR}/../bin/)...")
-                endif()
-                
-                file(COPY ${dll} DESTINATION ${CMAKE_SOURCE_DIR}/../bin/)
-            endforeach()
-        endif()
     endif()
 endfunction()
 
@@ -93,10 +93,22 @@ function(__BII_BOOST_INSTALL)
 #########################################################################################################
 
     #Version
-    set(__BII_BOOST_VERSION_DEFAULT 1.57.0)
+    set(__BII_BOOST_VERSION_DEFAULT 1.60.0)
 
     if(DEFINED BII_BOOST_GLOBAL_OVERRIDE_VERSION)
         set(BII_BOOST_VERSION ${BII_BOOST_GLOBAL_OVERRIDE_VERSION} ${SCOPE})
+    endif()
+
+    if(NOT GLOBAL_3RDPARTY_DIR)
+        if(WIN32)
+            set(GLOBAL_3RDPARTY_DIR C:/CMakeGlobal3rdParty)
+        else()
+            set(GLOBAL_3RDPARTY_DIR $ENV{HOME}/CMakeGlobal3rdParty)
+        endif()
+    endif()
+
+    if(NOT (EXISTS GLOBAL_3RDPARTY_DIR))
+        file(MAKE_DIRECTORY "${GLOBAL_3RDPARTY_DIR}")
     endif()
 
     if(NOT (BII_BOOST_VERSION))
@@ -110,17 +122,17 @@ function(__BII_BOOST_INSTALL)
     string(REGEX REPLACE  "[.]" "_" __BII_BOOST_VERSION_LABEL ${BII_BOOST_VERSION})
 
     #Directories
-    set(BII_BOOST_INSTALL_DIR ${BIICODE_ENV_DIR}/boost/${BII_BOOST_VERSION}            ${SCOPE})
+    set(BII_BOOST_INSTALL_DIR ${GLOBAL_3RDPARTY_DIR}/boost/${BII_BOOST_VERSION}        ${SCOPE})
     set(BII_BOOST_DIR         ${BII_BOOST_INSTALL_DIR}                                 ${SCOPE})
-    set(__BII_BOOST_TMPDIR    ${BIICODE_ENV_DIR}/tmp/boost/${BII_BOOST_VERSION}        ${SCOPE})
+    set(__BII_BOOST_TMPDIR    ${GLOBAL_3RDPARTY_DIR}/tmp/boost/${BII_BOOST_VERSION}    ${SCOPE})
     set(BII_BOOST_EXTRACT_DIR ${__BII_BOOST_TMPDIR}/boost_${__BII_BOOST_VERSION_LABEL} ${SCOPE})
 
     if(NOT (EXISTS __BII_BOOST_TMPDIR))
         file(MAKE_DIRECTORY "${__BII_BOOST_TMPDIR}")
     endif()
 
-    if(NOT (EXISTS ${BIICODE_ENV_DIR}/boost/))
-        file(MAKE_DIRECTORY "${BIICODE_ENV_DIR}/boost/")
+    if(NOT (EXISTS ${GLOBAL_3RDPARTY_DIR}/boost/))
+        file(MAKE_DIRECTORY "${GLOBAL_3RDPARTY_DIR}/boost/")
     endif()
 
 
@@ -137,11 +149,13 @@ function(__BII_BOOST_INSTALL)
 
     #Bootstrap
     if((CMAKE_SYSTEM_NAME MATCHES "Windows") AND (NOT CMAKE_CROSSCOMPILING))
-        set(__BII_BOOST_BOOSTRAPER ${BII_BOOST_DIR}/bootstrap.bat ${SCOPE})
-        set(__BII_BOOST_B2         ${BII_BOOST_DIR}/b2.exe        ${SCOPE})
+        set(__BII_BOOST_BOOSTRAPER ${BII_BOOST_DIR}/bootstrap.bat    ${SCOPE})
+        set(__BII_BOOST_B2         ${BII_BOOST_DIR}/b2.exe           ${SCOPE})
+        set(__BII_BOOST_BCP        ${BII_BOOST_DIR}/dist/bin/bcp.exe ${SCOPE})
     else()
         set(__BII_BOOST_BOOSTRAPER ${BII_BOOST_DIR}/bootstrap.sh ${SCOPE})
         set(__BII_BOOST_B2         ${BII_BOOST_DIR}/b2           ${SCOPE})
+        set(__BII_BOOST_BCP        ${BII_BOOST_DIR}/dist/bin/bcp ${SCOPE})
     endif()
 
     if(CMAKE_SYSTEM_NAME MATCHES "Windows")
@@ -201,6 +215,8 @@ function(__BII_BOOST_INSTALL)
 
         set(__BII_BOOST_B2_CALL ${__BII_BOOST_B2_CALL} cxxflags="-stdlib=libc++" linkflags="-stdlib=libc++" ${SCOPE})
     endif()
+
+    set(BII_BOOST_B2 ${})
     
     #Boost
 
@@ -236,6 +252,31 @@ function(__BII_BOOST_INSTALL)
 
     __BII_BOOST_BOOTSTRAP()
 
+    if(BII_FIND_BOOST_AUTOCOMPUTE_DEPS)
+        message(STATUS "Computing dependencies...")
+
+        set(components ${BII_BOOST_LIBS})
+        set(BII_NOOST_LIBS)
+
+        foreach(component ${components})
+            message(STATUS "Computing dependencies of ${component}")
+
+            solve_binary_dependencies(${component} deps)
+
+            foreach(dep ${deps})
+                message(STATUS "${component} depends on ${dep}")
+            endforeach()
+
+            list(APPEND new_components ${deps} ${component})
+        endforeach()
+
+        set(BII_BOOST_LIBS ${new_components})
+        list(REMOVE_DUPLICATES BII_BOOST_LIBS)
+
+        string(REGEX REPLACE ";" " " newcomps "${BII_BOOST_LIBS}")
+        message(STATUS "Final set of Boost components: ${newcomps}")
+    endif()
+
 #########################################################################################################
 #                                         BUILD                                                         #
 #########################################################################################################
@@ -262,12 +303,6 @@ function(__BII_BOOST_INSTALL)
         add_definitions( "-DHAS_BOOST" )
 
         if(BII_BOOST_VERBOSE)
-	    get_property(dirs DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
-
-	    foreach(dir ${dirs})
-  	    	message(STATUS "include_directories() entry: '${dir}'")
-	    endforeach()
-
             message(STATUS "BOOST_ROOT       ${BOOST_ROOT}")
             message(STATUS "BOOST_INCLUDEDIR ${BOOST_INCLUDEDIR}")
             message(STATUS "BOOST_LIBRARYDIR ${BOOST_LIBRARYDIR}")
@@ -275,6 +310,9 @@ function(__BII_BOOST_INSTALL)
     else()
         message(FATAL_ERROR "Boost not found after biicode setup!")
     endif()
+
+    set(BII_BOOST_BCP "${__BII_BOOST_BCP}" PARENT_SCOPE)
+    set(BII_BOOST_LIBS "${BII_BOOST_LIBS}" PARENT_SCOPE)
 
     set(BOOST_ROOT       "${BOOST_ROOT}"       PARENT_SCOPE)
     set(BOOST_INCLUDEDIR "${BOOST_INCLUDEDIR}" PARENT_SCOPE)
@@ -286,14 +324,25 @@ function(__BII_BOOST_INSTALL)
 endfunction()
 
 function(BII_SETUP_BOOST)
-    set(options REQUIRED STATIC DYNAMIC)
-    set(oneValueArgs TOOLSET)
+    set(options REQUIRED STATIC DYNAMIC AUTOCOMPUTE_DEPS)
+    set(oneValueArgs TOOLSET VERSION TARGET)
     set(multiValueArgs COMPONENTS)
     cmake_parse_arguments(BII_FIND_BOOST "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
+    if(BII_FIND_BOOST_VERSION)
+        set(BII_BOOST_VERSION ${BII_FIND_BOOST_VERSION})
+    endif()
+
     if(BII_FIND_BOOST_TOOLSET)
         set(BII_BOOST_TOOLSET ${BII_FIND_BOOST_TOOLSET})
-    endif()    
+    endif()
+
+    if(BII_FIND_BOOST_TARGET)
+        set(BII_BOOST_FOR_TARGET ${BII_FIND_BOOST_TARGET})
+        set(BII_BOOST_FOR_TARGET ${BII_BOOST_FOR_TARGET} PARENT_SCOPE)
+
+        message("Configuring Boost for target '${BII_BOOST_FOR_TARGET}'")
+    endif()
 
     set(BII_BOOST_LIBS ${BII_FIND_BOOST_COMPONENTS})
 
@@ -327,6 +376,9 @@ function(BII_SETUP_BOOST)
 
     __BII_BOOST_INSTALL()
 
+    set(BII_BOOST_BCP "${BII_BOOST_BCP}" PARENT_SCOPE)
+    set(BII_BOOST_LIBS "${BII_BOOST_LIBS}" PARENT_SCOPE)
+
     set(BII_FIND_BOOST_COMPONENTS ${BII_FIND_BOOST_COMPONENTS} PARENT_SCOPE)
     set(REQUIRED_FLAG             ${REQUIRED_FLAG}             PARENT_SCOPE)
     set(Boost_USE_STATIC_LIBS     ${Boost_USE_STATIC_LIBS}     PARENT_SCOPE)
@@ -341,6 +393,34 @@ function(BII_SETUP_BOOST)
     set(Boost_COMPILER     ${Boost_COMPILER}     PARENT_SCOPE)
 endfunction()
 
+function(windows_path PATH RESULT_PATH)
+    if(WIN32)
+        if(MINGW)
+            execute_process(
+                    COMMAND ${CMAKE_COMMAND} -E echo ${PATH}
+                    COMMAND xargs cmd //c echo # WTF cannot believe this worked the very first time
+                    OUTPUT_VARIABLE path
+            )
+
+            string(REGEX REPLACE "\"" "" path "${path}")
+        elseif(CYGWIN)
+            execute_process(
+                    COMMAND ${CMAKE_COMMAND} -E echo ${PATH}
+                    COMMAND xargs cygpath.exe --windows
+                    OUTPUT_VARIABLE path
+            )
+        else()
+            set(path "${PATH}")
+        endif()
+
+        string(REGEX REPLACE "/" "\\\\" path "${path}")
+        set(${RESULT_PATH} "${path}" PARENT_SCOPE)
+        message("WINDOWS PATH: ${path}")
+    else()
+        message(FATAL_ERROR "No Windows platform!")
+    endif()
+endfunction()
+
 function(BII_FIND_BOOST)
     BII_SETUP_BOOST(${ARGN})
 
@@ -350,10 +430,39 @@ function(BII_FIND_BOOST)
         message(STATUS "BOOST_LIBRARYDIR ${BOOST_LIBRARYDIR}")
     endif()
 
-    find_package(Boost COMPONENTS ${BII_FIND_BOOST_COMPONENTS} ${REQUIRED_FLAG})
+    find_package(Boost COMPONENTS ${BII_BOOST_LIBS} ${REQUIRED_FLAG})
 
     set(Boost_LIBRARIES    ${Boost_LIBRARIES}    PARENT_SCOPE)
     set(Boost_FOUND        ${Boost_FOUND}        PARENT_SCOPE)
     set(Boost_INCLUDE_DIRS ${Boost_INCLUDE_DIRS} PARENT_SCOPE)
     set(Boost_COMPILER     ${Boost_COMPILER}     PARENT_SCOPE)
+
+    set(BII_BOOST_BCP "${BII_BOOST_BCP}" PARENT_SCOPE)
+
+    if(BII_BOOST_FOR_TARGET)
+        message(STATUS "Setting up Boost dependencies for target '${BII_BOOST_FOR_TARGET}'")
+        target_link_libraries(${BII_BOOST_FOR_TARGET} PUBLIC ${Boost_LIBRARIES})
+        target_include_directories(${BII_BOOST_FOR_TARGET} PUBLIC ${Boost_INCLUDE_DIRS})
+
+        if((NOT (Boost_USE_STATIC_LIBS)) AND (WIN32 OR (CMAKE_SYSTEM_NAME MATCHES "Darwin")))
+            parse_library_list("${Boost_LIBRARIES}")
+
+            string(REGEX REPLACE ";" "," DEBUG_LIBS "${DEBUG_LIBS}")
+            string(REGEX REPLACE ";" "," OPTIMIZED_LIBS "${OPTIMIZED_LIBS}")
+            string(REGEX REPLACE ";" "," GENERAL_LIBS "${GENERAL_LIBS}")
+
+            add_custom_command(
+                TARGET ${BII_BOOST_FOR_TARGET} PRE_LINK
+                COMMAND ${CMAKE_COMMAND} 
+                    -DDEBUG_LIBS=\"${DEBUG_LIBS}\"
+                    -DOPTIMIZED_LIBS=\"${OPTIMIZED_LIBS}\"
+                    -DGENERAL_LIBS=\"${GENERAL_LIBS}\" 
+                    -DTARGET_DIR=\"$<TARGET_FILE:${BII_BOOST_FOR_TARGET}>\" 
+                    -DBUILD_CONFIG=\"$<UPPER_CASE:$<CONFIG>>\" 
+                    -DSYSTEM_NAME=\"${CMAKE_SYSTEM_NAME}\"
+                    -DBINARY_DIR=\"${CMAKE_BINARY_DIR}\"
+                -P \"${boost_install_dir}/copy_dynlibs.cmake\"
+            )
+        endif()
+    endif()
 endfunction()
