@@ -3,6 +3,7 @@ get_filename_component(boost_install_dir "${CMAKE_CURRENT_LIST_FILE}" PATH)
 include(${boost_install_dir}/utils.cmake)
 include(${boost_install_dir}/build_jobs.cmake)
 include(${boost_install_dir}/dependencies.cmake)
+include(${boost_install_dir}/export_variables.cmake)
 include(CMakeParseArguments)
 
 set(SCOPE PARENT_SCOPE)
@@ -26,12 +27,12 @@ endfunction()
 
 function(__BII_BOOST_DOWNLOAD)
     if(NOT (EXISTS ${BII_BOOST_PACKAGE_PATH}))
-        message(STATUS "Downloading Boost ${BII_BOOST_VERSION} from ${BII_BOOST_DOWNLOAD_URL}...") 
+        message(STATUS "Downloading Boost ${BII_BOOST_VERSION} from ${BII_BOOST_DOWNLOAD_URL}...")
 
         file(DOWNLOAD "${BII_BOOST_DOWNLOAD_URL}" "${BII_BOOST_PACKAGE_PATH}" SHOW_PROGRESS STATUS RESULT)
     else()
         if(BII_BOOST_VERBOSE)
-            message(STATUS "Download aborted. ${BII_BOOST_PACKAGE} was downloaded previously")   
+            message(STATUS "Download aborted. ${BII_BOOST_PACKAGE} was downloaded previously")
         endif()
     endif()
 
@@ -47,7 +48,7 @@ function(__BII_BOOST_DOWNLOAD)
         endif()
 
         execute_process(COMMAND ${CMAKE_COMMAND} -E tar xzf "${BII_BOOST_PACKAGE_PATH}" WORKING_DIRECTORY ${__BII_BOOST_TMPDIR})
-    
+
         file(RENAME "${BII_BOOST_EXTRACT_DIR}" "${BII_BOOST_INSTALL_DIR}")
     endif()
 endfunction()
@@ -201,10 +202,10 @@ function(__BII_BOOST_INSTALL)
         set(BII_BOOST_BUILD_J 1 CACHE INTERNAL "Biicode boost ${BII_BOOST_VERSION} build threads count")
     endif()
 
-    set(__BII_BOOST_B2_CALL ${__BII_BOOST_B2} --includedir=${BII_BOOST_DIR} 
-                                              --toolset=${BII_BOOST_TOOLSET} 
-                                              -j${BII_BOOST_BUILD_J} 
-                                              --layout=versioned 
+    set(__BII_BOOST_B2_CALL ${__BII_BOOST_B2} --includedir=${BII_BOOST_DIR}
+                                              --toolset=${BII_BOOST_TOOLSET}
+                                              -j${BII_BOOST_BUILD_J}
+                                              --layout=versioned
                                               --build-type=complete
                             ${SCOPE})
 
@@ -217,7 +218,7 @@ function(__BII_BOOST_INSTALL)
     endif()
 
     set(BII_BOOST_B2 ${})
-    
+
     #Boost
 
     #FindBoost directories
@@ -233,7 +234,7 @@ function(__BII_BOOST_INSTALL)
 
     #Disable auto-linking with MSVC
     if(MSVC)
-        add_definitions(-DBOOST_ALL_NO_LIB) 
+        add_definitions(-DBOOST_ALL_NO_LIB)
     endif()
 
     if(BII_BOOST_VERBOSE)
@@ -282,7 +283,7 @@ function(__BII_BOOST_INSTALL)
 #########################################################################################################
 
     __BII_BOOST_BUILD()
-    
+
 #########################################################################################################
 #                                     FINAL SETTINGS                                                    #
 #########################################################################################################
@@ -321,6 +322,16 @@ function(__BII_BOOST_INSTALL)
     set(Boost_FOUND        ${Boost_FOUND}        PARENT_SCOPE)
     set(Boost_INCLUDE_DIRS ${Boost_INCLUDE_DIRS} PARENT_SCOPE)
     set(Boost_COMPILER     ${Boost_COMPILER}     PARENT_SCOPE)
+
+    if(NOT BII_BOOST_CLI)
+        getListOfVarsStartingWith(__BII BII_PRIVATE_VARS)
+        export_variables(
+        VARIABLES
+            ${BII_PRIVATE_VARS}
+        FILE
+            ${CMAKE_BINARY_DIR}/boost_private_vars.cmake
+        )
+    endif()
 endfunction()
 
 function(BII_SETUP_BOOST)
@@ -361,7 +372,7 @@ function(BII_SETUP_BOOST)
         endif()
 
         if(NOT (DEFINED Boost_USE_STATIC_LIBS))
-            #Use bii_find_boost() named parameters only if Boost_USE_STATIC_LIBS was not set previously 
+            #Use bii_find_boost() named parameters only if Boost_USE_STATIC_LIBS was not set previously
             if(BII_FIND_BOOST_STATIC)
                 set(Boost_USE_STATIC_LIBS ON ${SCOPE})
             endif()
@@ -391,6 +402,20 @@ function(BII_SETUP_BOOST)
     set(Boost_FOUND        ${Boost_FOUND}        PARENT_SCOPE)
     set(Boost_INCLUDE_DIRS ${Boost_INCLUDE_DIRS} PARENT_SCOPE)
     set(Boost_COMPILER     ${Boost_COMPILER}     PARENT_SCOPE)
+
+    if(NOT BII_BOOST_CLI)
+        create_boost_targets()
+
+        getListOfVarsStartingWith(BII BII_API_VARS)
+        export_variables(
+        VARIABLES
+            ${BII_API_VARS}
+        FILE
+            ${CMAKE_BINARY_DIR}/boost_api_vars.cmake
+        )
+    else()
+
+    endif()
 endfunction()
 
 function(windows_path PATH RESULT_PATH)
@@ -441,8 +466,6 @@ function(BII_FIND_BOOST)
 
     if(BII_BOOST_FOR_TARGET)
         message(STATUS "Setting up Boost dependencies for target '${BII_BOOST_FOR_TARGET}'")
-        target_link_libraries(${BII_BOOST_FOR_TARGET} PUBLIC ${Boost_LIBRARIES})
-        target_include_directories(${BII_BOOST_FOR_TARGET} PUBLIC ${Boost_INCLUDE_DIRS})
 
         if((NOT (Boost_USE_STATIC_LIBS)) AND (WIN32 OR (CMAKE_SYSTEM_NAME MATCHES "Darwin")))
             parse_library_list("${Boost_LIBRARIES}")
@@ -453,12 +476,12 @@ function(BII_FIND_BOOST)
 
             add_custom_command(
                 TARGET ${BII_BOOST_FOR_TARGET} PRE_LINK
-                COMMAND ${CMAKE_COMMAND} 
+                COMMAND ${CMAKE_COMMAND}
                     -DDEBUG_LIBS=\"${DEBUG_LIBS}\"
                     -DOPTIMIZED_LIBS=\"${OPTIMIZED_LIBS}\"
-                    -DGENERAL_LIBS=\"${GENERAL_LIBS}\" 
-                    -DTARGET_DIR=\"$<TARGET_FILE:${BII_BOOST_FOR_TARGET}>\" 
-                    -DBUILD_CONFIG=\"$<UPPER_CASE:$<CONFIG>>\" 
+                    -DGENERAL_LIBS=\"${GENERAL_LIBS}\"
+                    -DTARGET_DIR=\"$<TARGET_FILE:${BII_BOOST_FOR_TARGET}>\"
+                    -DBUILD_CONFIG=\"$<UPPER_CASE:$<CONFIG>>\"
                     -DSYSTEM_NAME=\"${CMAKE_SYSTEM_NAME}\"
                     -DBINARY_DIR=\"${CMAKE_BINARY_DIR}\"
                 -P \"${boost_install_dir}/copy_dynlibs.cmake\"
