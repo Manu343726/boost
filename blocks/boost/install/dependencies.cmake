@@ -221,8 +221,10 @@ function(create_boost_targets)
         boost_target(${component})
     endforeach()
 
-    add_library(Boost_headeronly_TARGET INTERFACE)
-    set_target_properties(Boost_headeronly_TARGET
-        PROPERTIES INTERFACE_INCLUDE_DIRECTORIES ${Boost_INCLUDE_DIRS}
-    )
+    if(NOT (TARGET Boost_headeronly_TARGET))
+        add_library(Boost_headeronly_TARGET INTERFACE)
+        set_target_properties(Boost_headeronly_TARGET
+            PROPERTIES INTERFACE_INCLUDE_DIRECTORIES ${Boost_INCLUDE_DIRS}
+        )
+    endif()
 endfunction()
