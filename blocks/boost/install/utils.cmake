@@ -1,14 +1,14 @@
 function(__COMPUTE_COMPILER_VERSION_GNULIKE _ret)
-	if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-		EXECUTE_PROCESS( COMMAND ${CMAKE_CXX_COMPILER} --version OUTPUT_VARIABLE version_string_full )
-		string (REGEX REPLACE ".*clang version ([0-9]+\\.[0-9]+).*" "\\1" version_string ${version_string_full})
-	elseif(CMAKE_COMPILER_IS_GNUCXX)
-		EXECUTE_PROCESS( COMMAND ${CMAKE_CXX_COMPILER} -dumpversion OUTPUT_VARIABLE version_string)
-		string (REGEX REPLACE "([0-9])\\.([0-9])\\.([0-9])" "\\1.\\2.\\3" version_string ${version_string})
-    string(STRIP ${version_string} version_string) #Remove extra newline character
-	endif()
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    	EXECUTE_PROCESS( COMMAND ${CMAKE_CXX_COMPILER} --version OUTPUT_VARIABLE version_string_full )
+	string (REGEX REPLACE ".*clang version ([0-9]+\\.[0-9]+).*" "\\1" version_string ${version_string_full})
+    elseif(CMAKE_COMPILER_IS_GNUCXX)
+        EXECUTE_PROCESS( COMMAND ${CMAKE_CXX_COMPILER} -dumpversion OUTPUT_VARIABLE version_string)
+        string (REGEX REPLACE "([0-9])\\.([0-9])\\.([0-9])" "\\1.\\2.\\3" version_string ${version_string})
+        string(STRIP ${version_string} version_string) #Remove extra newline character
+    endif()
 
-	set(${_ret} ${version_string} PARENT_SCOPE)
+    set(${_ret} ${version_string} PARENT_SCOPE)
 endfunction()
 
 function(COMPILER_VERSION _ret)

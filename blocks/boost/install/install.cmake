@@ -6,6 +6,9 @@ include(${boost_install_dir}/dependencies.cmake)
 include(${boost_install_dir}/export_variables.cmake)
 include(CMakeParseArguments)
 
+# Override default FindBoost.cmake
+list(APPEND CMAKE_MODULE_PATH "${boost_install_dir}")
+
 set(SCOPE PARENT_SCOPE)
 
 function(__BII_BOOST_PRINT_SETUP)

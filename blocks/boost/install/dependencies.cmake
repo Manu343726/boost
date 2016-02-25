@@ -202,6 +202,9 @@ function(boost_target component)
                 -DBII_BOOST_CLI_COMPONENT=\"${component}\"
                 -DBII_BOOST_CLI_LIB_DEBUG=\"${debug_lib}\"
                 -DBII_BOOST_CLI_LIB_RELEASE=\"${release_lib}\"
+                -DCMAKE_CXX_COMPILER=\"${CMAKE_CXX_COMPILER}\"
+                -DCMAKE_C_COMPILER=\"${CMAKE_C_COMPILER}\"
+                -DCMAKE_BUILD_TYPE=\"${CMAKE_BUILD_TYPE}\"
                 -Wno-dev
             WORKING_DIRECTORY "${jobs_binary_dir}"
             COMMENT "Building Boost ${component}..."
