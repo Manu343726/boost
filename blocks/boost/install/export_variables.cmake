@@ -15,19 +15,16 @@ function(export_variables)
     file(WRITE "${export_FILE}" "${text}")
 endfunction()
 
-function(import_variables)
-    cmake_parse_arguments(import
-        ""
-        "FILE"
-        ""
-        "${ARGN}"
-    )
+function(import_variables FILE)
+    if(FILE)
+        file(STRINGS "${FILE}" lines)
 
-    file(STRINGS "${import_FILE}" lines)
-
-    foreach(line ${lines})
-        if(line MATCHES "\"(.+)\":\"(.+)\"")
-            set(${CMAKE_MATCH_1} "${CMAKE_MATCH_2}" PARENT_SCOPE)
-        endif()
-    endforeach()
+        foreach(line ${lines})
+            if(line MATCHES "\"(.+)\":\"(.+)\"")
+                set(${CMAKE_MATCH_1} "${CMAKE_MATCH_2}" PARENT_SCOPE)
+            endif()
+        endforeach()
+    else()
+        message(FATAL_ERROR "Import file '${FILE}' not found")
+    endif()
 endfunction()

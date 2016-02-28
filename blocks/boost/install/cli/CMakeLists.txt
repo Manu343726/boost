@@ -14,9 +14,10 @@ include(${dir}/../export_variables.cmake)
 
 function(run)
     message(STATUS "[MODULAR BOOST] Setting up ${BII_BOOST_CLI_COMPONENT}")
+    message(STATUS "Importing variables from '${BII_ROOT_BINARY_DIR}' directory")
 
-    import_variables(${CMAKE_BINARY_DIR}/boost_api_vars.cmake)
-    import_variables(${CMAKE_BINARY_DIR}/boost_private_vars.cmake)
+    import_variables(${BII_ROOT_BINARY_DIR}/boost_api_vars.cmake)
+    import_variables(${BII_ROOT_BINARY_DIR}/boost_private_vars.cmake)
 
     set(BII_BOOST_CLI TRUE)
     set(BII_BOOST_LIBS ${BII_BOOST_CLI_COMPONENT})

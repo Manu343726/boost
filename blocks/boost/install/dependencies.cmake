@@ -148,7 +148,7 @@ function(boost_target component)
 
     if(WIN32)
         if(Boost_USE_STATIC_LIBS)
-            set(lib_suffix .s)
+            set(lib_suffix .lib)
         else()
             set(lib_suffix .dll)
         endif()
@@ -205,6 +205,7 @@ function(boost_target component)
                 -DCMAKE_CXX_COMPILER=\"${CMAKE_CXX_COMPILER}\"
                 -DCMAKE_C_COMPILER=\"${CMAKE_C_COMPILER}\"
                 -DCMAKE_BUILD_TYPE=\"${CMAKE_BUILD_TYPE}\"
+                -DBII_ROOT_BINARY_DIR=\"${CMAKE_BINARY_DIR}\"
                 -Wno-dev
             WORKING_DIRECTORY "${jobs_binary_dir}"
             COMMENT "Building Boost ${component}..."
