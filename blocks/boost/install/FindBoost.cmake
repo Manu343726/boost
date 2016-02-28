@@ -185,7 +185,6 @@
 # (To distribute this file outside of CMake, substitute the full
 #  License text for the above reference.)
 
-message(STATUS "CUSTOM FindBoost.cmake FILE!!!")
 
 #-------------------------------------------------------------------------------
 # Before we go searching, check whether boost-cmake is available, unless the
