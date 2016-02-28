@@ -312,8 +312,9 @@ function(__BII_BOOST_INSTALL)
         message(FATAL_ERROR "Boost not found after biicode setup!")
     endif()
 
-    set(BII_BOOST_BCP "${__BII_BOOST_BCP}" PARENT_SCOPE)
-    set(BII_BOOST_LIBS "${BII_BOOST_LIBS}" PARENT_SCOPE)
+    set(BII_BOOST_BCP     "${__BII_BOOST_BCP}"   PARENT_SCOPE)
+    set(BII_BOOST_LIBS    "${BII_BOOST_LIBS}"    PARENT_SCOPE)
+    set(BII_BOOST_TOOLSET "${BII_BOOST_TOOLSET}" PARENT_SCOPE)
 
     set(BOOST_ROOT       "${BOOST_ROOT}"       PARENT_SCOPE)
     set(BOOST_INCLUDEDIR "${BOOST_INCLUDEDIR}" PARENT_SCOPE)

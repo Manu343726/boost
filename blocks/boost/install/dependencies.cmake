@@ -148,7 +148,7 @@ function(boost_target component)
 
     if(WIN32)
         if(Boost_USE_STATIC_LIBS)
-            set(lib_suffix .s)
+            set(lib_suffix .lib)
         else()
             set(lib_suffix .dll)
         endif()
@@ -202,6 +202,7 @@ function(boost_target component)
                 -DBII_BOOST_CLI_COMPONENT=\"${component}\"
                 -DBII_BOOST_CLI_LIB_DEBUG=\"${debug_lib}\"
                 -DBII_BOOST_CLI_LIB_RELEASE=\"${release_lib}\"
+                -DBII_ROOT_BINARY_DIR=\"${CMAKE_BINARY_DIR}\"
                 -Wno-dev
             WORKING_DIRECTORY "${jobs_binary_dir}"
             COMMENT "Building Boost ${component}..."
